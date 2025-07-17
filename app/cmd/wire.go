@@ -11,13 +11,14 @@ import (
 	"appsku-golang/app/routes"
 	"appsku-golang/app/services"
 	"appsku-golang/app/usecases"
+	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 
 	"appsku-golang/app/global-utils/grpcclient"
 	kafkadbo "appsku-golang/app/global-utils/kafka"
 	"appsku-golang/app/global-utils/mongodb"
 	"appsku-golang/app/global-utils/redisdb"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 	"google.golang.org/grpc"
 )
@@ -71,6 +72,17 @@ func InitializeHttpServer(grpcParams []grpcclient.GRPCClientParam, redisParam re
 		storeSet,
 		//grpcServiceSet,
 		routes.NewHttpRoute,
+	)
+	return nil
+}
+
+func InitializeFiberServer(grpcParams []grpcclient.GRPCClientParam, redisParam redisdb.RedisParam, kafkaParam []string, mongoDBParam mongodb.MongoDBParam) *fiber.App {
+	wire.Build(
+		pkgSet,
+		exampleSet,
+		storeSet,
+		//grpcServiceSet,
+		routes.NewFiberRoute,
 	)
 	return nil
 }

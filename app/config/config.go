@@ -27,6 +27,7 @@ type Configuration struct {
 	PublicSSLPath  string
 	EncryptKey     string
 	EncryptIV      string
+	WebFramework   string
 	Database       struct {
 		Mongo struct {
 			Host        string
@@ -87,6 +88,7 @@ func InitConfig() {
 	cfg.LogLevel = GetEnvString("LOG_LEVEL", "debug")
 	cfg.PrivateSSLPath = GetEnvString("PRIVATE_SSL_PATH", "")
 	cfg.PublicSSLPath = GetEnvString("PUBLIC_SSL_PATH", "")
+	cfg.WebFramework = GetEnvString("WEB_FRAMEWORK", "gin")
 
 	// encryption getting config
 	cfg.EncryptKey = GetEnvString("ENCRYPT_KEY", "")

@@ -19,6 +19,7 @@ import (
 	"appsku-golang/app/services"
 	"appsku-golang/app/usecases"
 	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 	"github.com/google/wire"
 	"google.golang.org/grpc"
 )
@@ -36,6 +37,19 @@ func InitializeHttpServer(grpcParams []grpcclient.GRPCClientParam, redisParam re
 	storeController := controllers.NewStoreController(iStoreUseCase)
 	engine := routes.NewHttpRoute(exampleController, storeController)
 	return engine
+}
+
+func InitializeFiberServer(grpcParams []grpcclient.GRPCClientParam, redisParam redisdb.RedisParam, kafkaParam []string, mongoDBParam mongodb.MongoDBParam) *fiber.App {
+	iMongoDB := mongodb.NewMongoDB(mongoDBParam)
+	iRedis := redisdb.NewRedisConn(redisParam)
+	iExampleRepository := repositories.NewExampleRepository(iMongoDB, iRedis)
+	iExampleUseCase := usecases.NewExampleUseCase(iExampleRepository)
+	exampleController := controllers.NewExampleController(iExampleUseCase)
+	iStoreRepository := repositories.NewStoreRepository(iMongoDB, iRedis)
+	iStoreUseCase := usecases.NewStoreUseCase(iStoreRepository)
+	storeController := controllers.NewStoreController(iStoreUseCase)
+	app := routes.NewFiberRoute(exampleController, storeController)
+	return app
 }
 
 func InitializeGrpcServer(grpcParams []grpcclient.GRPCClientParam, redisParam redisdb.RedisParam, kafkaParam []string, mongoDBParam mongodb.MongoDBParam) *grpc.Server {

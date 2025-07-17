@@ -10,6 +10,7 @@ import (
 	kafkadbo "appsku-golang/app/global-utils/kafka"
 
 	"github.com/google/uuid"
+	"github.com/segmentio/kafka-go"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -27,7 +28,7 @@ func MainConsumerHandler(ctrl *controllers.ConsumerController, kafkaConn kafkadb
 	return &ConsumerHandler{
 		Kafka:           kafkaConn,
 		Controller:      ctrl,
-		StoreController: any,
+		StoreController: nil,
 	}
 }
 
@@ -50,7 +51,12 @@ func (h *ConsumerHandler) BindConsumer(ctx context.Context, cfg config.Configura
 		consumer.Name = queueName
 		consumer.GroupId = consumer.Name
 		consumer.Topic = constants.TopicStore
-		consumer.Worker = h.StoreController
+		if h.StoreController != nil {
+			consumer.Worker = h.StoreController.(func(ctx context.Context, m kafka.Message) bool)
+		} else {
+			log.Panicf("StoreController is nil")
+			return
+		}
 	default:
 		log.Panicf("Invalid consumer name: %s", consumer.Name)
 		return
