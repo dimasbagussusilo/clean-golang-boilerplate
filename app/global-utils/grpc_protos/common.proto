@@ -1,0 +1,22 @@
+syntax="proto3";
+package grpc_protos;
+
+option go_package = "appsku-golang/app/global-utils/generated/grpc_protos";
+
+message ErrorLog {
+  string message = 1;
+  string system_message = 2;
+}
+
+message IdStringRequest {
+  string id = 1;
+}
+
+message IdIntRequest {
+  int64 id = 1;
+}
+
+message DeleteByIdResponse {
+  int32 status_code = 1;
+  ErrorLog error_log = 2;
+}

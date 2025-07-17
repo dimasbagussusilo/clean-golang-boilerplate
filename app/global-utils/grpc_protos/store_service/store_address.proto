@@ -1,0 +1,57 @@
+syntax="proto3";
+package grpcs;
+
+option go_package = "./grpc-protos";
+
+message GetStoreAddressByIDRequest {
+  int32 id = 1;
+}
+
+message GetStoreAddressByStoreIDAndIsMainRequest{
+  int32 store_id=1;
+  int32 is_main=2;
+}
+
+message StoreAddressResponse {
+  int32 id=1;
+  string name=2;
+  int32 store_id=3;
+  string email=4;
+  string mobile_phone=5;
+  string phone=6;
+  string pic_name=7;
+  string description=8;
+  int32 is_main=9;
+  int32 is_warehouse=10;
+  string g_lat=11;
+  string g_lng=12;
+  string g_place_id=13;
+  string address=14;
+  int32 province_id=15;
+  string province_name=16;
+  int32 city_id=17;
+  string city_name=18;
+  int32 district_id=19;
+  string district_name=20;
+  int64 village_id=21;
+  string village_name=22;
+  string store_code=23;
+  string store_name=24;
+}
+
+message StoreAddressErrorResponse {
+  string message =1;
+  string system_message = 2;
+  int32  status_code =3;
+}
+
+message GetStoreAddressResponse {
+  int32 status_code=1;
+  StoreAddressResponse data=2;
+  StoreAddressErrorResponse error=3;
+}
+
+service StoreAddressService {
+  rpc GetStoreAddressByID(GetStoreAddressByIDRequest) returns (GetStoreAddressResponse){}
+  rpc GetStoreAddressByStoreIDAndIsMain(GetStoreAddressByStoreIDAndIsMainRequest) returns (GetStoreAddressResponse){}
+}

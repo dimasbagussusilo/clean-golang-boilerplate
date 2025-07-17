@@ -1,0 +1,79 @@
+syntax="proto3";
+package grpcs;
+
+option go_package = "./grpc-protos";
+
+message MappingStoreError {
+    string message=1;
+    string system_message=2;
+    int32 status_code=3;
+}
+
+message CountValidMappingStoreByListOfIDData {
+    int32 total_store=1;
+    int32 total_prospect=2;
+}
+
+message CountValidMappingStoreByListOfIDRequest {
+    repeated int32 id_list=1;
+}
+
+message CountValidMappingStoreByListOfIDResponse {
+    int32 status_code=1;
+    CountValidMappingStoreByListOfIDData data=2;
+    MappingStoreError error=3;
+}
+
+message MappingStore {
+    int32 id=1;
+    int32 agent_id=2;
+    int32 store_id=3;
+    int32 use_apps=4;
+    string alias_name=5;
+    string alias_code=6; 
+	string date_prospect=7;
+    string date_mystore=8;
+    string event_source=9;
+    string created_at=10;
+    string updated_at=11;
+	string deleted_at=12;
+}
+
+message MappingStoreZonasiData {
+    int32 id=1;
+    int32 agent_id=2;
+    int32 store_id=3;
+    int32 brand_id=4;
+    int32 is_active=5;
+	string deleted_at=6;
+}
+
+message GetMappingStoreByAgentIDAndStoreIDRequest {
+    int32 agent_id=1;
+    int32 store_id=2;
+}
+
+message GetMappingStoreZonasiByAgentIDAndStoreIDAndBrandIDRequest {
+    int32 agent_id=1;
+    int32 store_id=2;
+    int32 brand_id=3;
+}
+
+message GetMappingStoreByAgentIDAndStoreIDResponse {
+    int32 status_code=1;
+    MappingStore data=2;
+    MappingStoreError error=3;
+}
+
+message GetMappingStoreZonasiByAgentIDAndStoreIDAndBrandIDResponse {
+    int32 status_code=1;
+    MappingStoreZonasiData data=2;
+    int32 total=3;
+    MappingStoreError error=4;
+}
+
+service MappingStoreService {
+    rpc CountValidMappingStoreByListOfID(CountValidMappingStoreByListOfIDRequest) returns (CountValidMappingStoreByListOfIDResponse) {}
+    rpc GetMappingStoreByAgentIDAndStoreID(GetMappingStoreByAgentIDAndStoreIDRequest) returns (GetMappingStoreByAgentIDAndStoreIDResponse) {}
+    rpc GetMappingStoreZonasiByAgentIDAndStoreIDAndBrandID(GetMappingStoreZonasiByAgentIDAndStoreIDAndBrandIDRequest) returns (GetMappingStoreZonasiByAgentIDAndStoreIDAndBrandIDResponse) {}
+}

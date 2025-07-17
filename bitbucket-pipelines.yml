@@ -1,0 +1,413 @@
+# Set Enviroment Global (Repeat every step)
+x-env: &export-env
+         export APP_ENV=$BITBUCKET_BRANCH
+         export REPOSITORY_NAME=$BITBUCKET_REPO_SLUG
+         export AUTH_USER=$AUTH_USER
+         export AUTH_TOKEN=$AUTH_TOKEN
+         export BITBUCKET_BRANCH=$BITBUCKET_BRANCH
+         export IMAGES=$(echo $BITBUCKET_BRANCH | tr -dc '[a-zA-Z0-9-_.]\n\r' | tr '[:upper:]' '[:lower:]')
+
+# Set Variable s3 uploads for pipes aws-code-deploy
+x-uploads-variables: &uploads-variables
+  AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+  AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+  S3_BUCKET: $S3_BUCKET
+  COMMAND: "upload"
+  APPLICATION_NAME: $BITBUCKET_REPO_SLUG
+  ZIP_FILE: "$BITBUCKET_REPO_SLUG.zip"
+
+# Set Variable Depolyment api for pipes aws-code-deploy
+x-deploy-variables-api: &deploy-variables-api
+  AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+  AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+  S3_BUCKET: $S3_BUCKET
+  COMMAND: "deploy"
+  APPLICATION_NAME: $BITBUCKET_REPO_SLUG
+  DEPLOYMENT_GROUP: api
+  IGNORE_APPLICATION_STOP_FAILURES: "true"
+  FILE_EXISTS_BEHAVIOR: "OVERWRITE"
+  WAIT: "true"
+  CODE_DEPLOY_ARN: $CODE_DEPLOY_ARN
+
+# Set Variable Depolyment consumer for pipes aws-code-deploy
+x-deploy-variables-consumer: &deploy-variables-consumer
+  AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+  AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+  S3_BUCKET: $S3_BUCKET
+  COMMAND: "deploy"
+  APPLICATION_NAME: $BITBUCKET_REPO_SLUG
+  DEPLOYMENT_GROUP: consumer
+  IGNORE_APPLICATION_STOP_FAILURES: "true"
+  FILE_EXISTS_BEHAVIOR: "OVERWRITE"
+  WAIT: "true"
+  CODE_DEPLOY_ARN: $CODE_DEPLOY_ARN
+
+# Define Task / step (Build, Deoploy api, Deploy Consumer)
+# Custom runner https://community.atlassian.com/t5/Bitbucket-questions/Bitbucket-Pipeline-keeps-on-showing-not-enough-memory/qaq-p/2299076
+definitions:
+  steps:
+    ##########
+    # Build
+    ##########
+    - step: &build
+        name: Docker Build & Push to ECR
+        services:
+          - docker
+
+        image: public.ecr.aws/v3u2f5f3/dbo:awscli-alpine
+        script:
+          - *export-env # Call script from export
+          - sed -i "s+\$ENT+/srv/app/$REPOSITORY_NAME+g;" Dockerfile
+          - eval $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
+          - docker build -t $AWS_REGISTRY_URL/$REPOSITORY_NAME:$IMAGES --build-arg REPOSITORY_NAME=$REPOSITORY_NAME --build-arg APP_ENV=$APP_ENV -f Dockerfile .
+          - docker push $AWS_REGISTRY_URL/$REPOSITORY_NAME:$IMAGES
+
+    ##########
+    # Build-prod
+    ##########
+    - step: &build-prod
+        name: Docker Build & Push to ECR
+        services:
+          - docker
+        image: public.ecr.aws/v3u2f5f3/dbo:awscli-alpine
+        script:
+          - *export-env # Call script from export env
+          - sed -i "s+\$ENT+/srv/app/$REPOSITORY_NAME+g;" Dockerfile
+          - export "IMAGES=$BITBUCKET_TAG"
+          - export "APP_ENV=production"
+          - eval $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
+          - docker build -t $AWS_REGISTRY_URL/$REPOSITORY_NAME:$IMAGES --build-arg REPOSITORY_NAME=$REPOSITORY_NAME --build-arg APP_ENV=$APP_ENV -f Dockerfile .
+          - docker push $AWS_REGISTRY_URL/$REPOSITORY_NAME:$IMAGES
+          # Set image ke latest
+          - docker tag $AWS_REGISTRY_URL/$REPOSITORY_NAME:$IMAGES $AWS_REGISTRY_URL/$REPOSITORY_NAME:latest
+          - docker push $AWS_REGISTRY_URL/$REPOSITORY_NAME:latest
+    - step: &sonar
+        name: SonarQube
+        caches:
+          - sonar
+        script:
+          - pipe: sonarsource/sonarqube-scan:2.0.1
+            variables:
+              SONAR_HOST_URL: ${SONAR_HOST_URL} # Get the value from the repository/workspace variable.
+              SONAR_TOKEN: ${SONAR_TOKEN} # Get the value from the repository/workspace variable. You shouldn't set secret in clear text here.
+        clone:
+          depth: full
+
+    # DEPLOY ECS
+#    - step: &deploy-ecs
+#        name: Deploy ECS
+#        services:
+#          - docker
+#        image: public.ecr.aws/v3u2f5f3/dbo:awscli-alpine
+#        script:
+#          - source set_env.sh
+#
+#          # Salesman
+#          - aws ecs update-service --cluster Api --service api-old-member --force-new-deployment
+
+    ######################
+    # Deploy to Prod api server
+    ######################
+    - step: &deploy-prod
+        name: AWS Code Deploy Api
+        services:
+          - docker
+        caches:
+          - docker
+        image: public.ecr.aws/v3u2f5f3/dbo:awscli-alpine
+        script:
+          # Replace Variable in file start & stop script
+          - *export-env # Call script from export env
+          - source set_env.sh
+          # Change repository name on appspec.yml
+          - sed -i "s+\$REPOSITORY_NAME+$REPOSITORY_NAME+g;" appspec.yml
+          # Change var on start.sh
+          - sed -i "s+\$REPOSITORY_NAME+$REPOSITORY_NAME+g;" scripts/start.sh
+          - sed -i "s+\$IMAGES+latest+g;" scripts/start.sh
+          - sed -i "s+\$AWS_REGISTRY_URL+$AWS_REGISTRY_URL+g;" scripts/start.sh
+          - sed -i "s+\$APP_ENV+$APP_ENV+g;" scripts/start.sh
+          - sed -i "s+\$HANDLER_TYPE+http+g;" scripts/start.sh
+          # Change var on stop.sh
+          - sed -i "s+\$HANDLER_TYPE+http+g;" scripts/stop.sh
+          - sed -i "s+\$REPOSITORY_NAME+$REPOSITORY_NAME+g;" scripts/stop.sh
+          # Archive with zip folder scripts
+          - zip -r $BITBUCKET_REPO_SLUG.zip appspec.yml scripts
+          # Check if application exists
+          - echo "Checking if application exists..."
+          - |
+            APP_EXISTS=$(aws deploy get-application --application-name $REPOSITORY_NAME || true)
+            if [ -z "$APP_EXISTS" ]; then
+              echo "Application does not exist, creating..."
+              aws deploy create-application --application-name $REPOSITORY_NAME
+            else
+              echo "Application already exists, skipping creation..."
+            fi
+          # Check if deployment group exists
+          - echo "Checking if deployment group exists..."
+          - |
+            DEPLOYMENT_GROUP_EXISTS=$(aws deploy get-deployment-group --application-name $REPOSITORY_NAME --deployment-group-name $DEPLOYMENT_GROUP_API || true)
+            if [ -z "$DEPLOYMENT_GROUP_EXISTS" ]; then
+              echo "Deployment group does not exist, creating..."
+              aws deploy create-deployment-group --application-name $REPOSITORY_NAME --deployment-group-name $DEPLOYMENT_GROUP_API --ec2-tag-filters Key=Name,Value=$EC2_NAME_API,Type=KEY_AND_VALUE --service-role-arn $CODE_DEPLOY_ARN
+
+            else
+              echo "Deployment group already exists, skipping creation..."
+            fi
+          # Uploads Zip FIle into S3
+          - pipe: atlassian/aws-code-deploy:0.2.10
+            variables:
+              <<: *uploads-variables # Insert Variables from uploads-variables
+          # Deploy file zip into server & running script file
+          - pipe: atlassian/aws-code-deploy:0.2.10
+            variables:
+              <<: *deploy-variables-api # Insert Variables from deploy-variables-api
+
+    ######################
+    # Deploy to Prod Consumer server
+    ######################
+    - step: &deploy-prod-consumer
+        name: AWS Code Deploy Consumer
+        services:
+          - docker
+        caches:
+          - docker
+        image: public.ecr.aws/v3u2f5f3/dbo:awscli-alpine
+        script:
+          # Replace Variable in file start & stop script
+          - *export-env # Call script from export env
+          - source set_env.sh
+          # Change repository name on appspec.yml
+          - sed -i "s+\$REPOSITORY_NAME+$REPOSITORY_NAME+g;" appspec.yml
+          # Change var on start.sh
+          - sed -i "s+\$REPOSITORY_NAME+$REPOSITORY_NAME+g;" scripts/start.sh
+          - sed -i "s+\$IMAGES+latest+g;" scripts/start.sh
+          - sed -i "s+\$AWS_REGISTRY_URL+$AWS_REGISTRY_URL+g;" scripts/start.sh
+          - sed -i "s+\$APP_ENV+$APP_ENV+g;" scripts/start.sh
+          - sed -i "s+\$HANDLER_TYPE+consumer+g;" scripts/start.sh
+          # Change var on stop.sh
+          - sed -i "s+\$HANDLER_TYPE+consumer+g;" scripts/stop.sh
+          - sed -i "s+\$REPOSITORY_NAME+$REPOSITORY_NAME+g;" scripts/stop.sh
+          # Archive with zip folder scripts
+          - zip -r $BITBUCKET_REPO_SLUG.zip appspec.yml scripts
+          # Check if application exists
+          - echo "Checking if application exists..."
+          - |
+            APP_EXISTS=$(aws deploy get-application --application-name $REPOSITORY_NAME || true)
+            if [ -z "$APP_EXISTS" ]; then
+              echo "Application does not exist, creating..."
+              aws deploy create-application --application-name $REPOSITORY_NAME
+            else
+              echo "Application already exists, skipping creation..."
+            fi
+          # Check if deployment group exists
+          - echo "Checking if deployment group exists..."
+          - |
+            DEPLOYMENT_GROUP_EXISTS=$(aws deploy get-deployment-group --application-name $REPOSITORY_NAME --deployment-group-name $DEPLOYMENT_GROUP_CONSUMER || true)
+            if [ -z "$DEPLOYMENT_GROUP_EXISTS" ]; then
+              echo "Deployment group does not exist, creating..."
+              aws deploy create-deployment-group --application-name $REPOSITORY_NAME --deployment-group-name $DEPLOYMENT_GROUP_CONSUMER --ec2-tag-filters Key=Name,Value=$EC2_NAME_CONSUMER,Type=KEY_AND_VALUE --service-role-arn $CODE_DEPLOY_ARN
+
+            else
+              echo "Deployment group already exists, skipping creation..."
+            fi
+          # Uploads Zip FIle into S3
+          - pipe: atlassian/aws-code-deploy:0.2.10
+            variables:
+              <<: *uploads-variables # Insert Variables from uploads-variables
+          # Deploy file zip into server & running script file
+          - pipe: atlassian/aws-code-deploy:0.2.10
+            variables:
+              <<: *deploy-variables-consumer # Insert Variables from deploy-variables-consumer
+
+    ######################
+    # Deploy to dev staging api server
+    ######################
+    - step: &deploy-api
+        name: AWS Code Deploy Api
+        services:
+          - docker
+        caches:
+          - docker
+        image: public.ecr.aws/v3u2f5f3/dbo:awscli-alpine
+        script:
+          # Replace Variable in file start & stop script
+          - *export-env # Call script from export env
+          - source set_env.sh
+          # Change repository name on appspec.yml
+          - sed -i "s+\$REPOSITORY_NAME+$REPOSITORY_NAME+g;" appspec.yml
+          # Change var on start.sh
+          - sed -i "s+\$REPOSITORY_NAME+$REPOSITORY_NAME+g;" scripts/start.sh
+          - sed -i "s+\$IMAGES+$IMAGES+g;" scripts/start.sh
+          - sed -i "s+\$AWS_REGISTRY_URL+$AWS_REGISTRY_URL+g;" scripts/start.sh
+          - sed -i "s+\$APP_ENV+$APP_ENV+g;" scripts/start.sh
+          - sed -i "s+\$HANDLER_TYPE+http+g;" scripts/start.sh
+          # Change var on stop.sh
+          - sed -i "s+\$HANDLER_TYPE+http+g;" scripts/stop.sh
+          - sed -i "s+\$REPOSITORY_NAME+$REPOSITORY_NAME+g;" scripts/stop.sh
+          # Archive with zip folder scripts
+          - zip -r $BITBUCKET_REPO_SLUG.zip appspec.yml scripts
+          # Check if application exists
+          - echo "Checking if application exists..."
+          - |
+            APP_EXISTS=$(aws deploy get-application --application-name $REPOSITORY_NAME || true)
+            if [ -z "$APP_EXISTS" ]; then
+              echo "Application does not exist, creating..."
+              aws deploy create-application --application-name $REPOSITORY_NAME
+            else
+              echo "Application already exists, skipping creation..."
+            fi
+          # Check if deployment group exists
+          - echo "Checking if deployment group exists..."
+          - |
+            DEPLOYMENT_GROUP_EXISTS=$(aws deploy get-deployment-group --application-name $REPOSITORY_NAME --deployment-group-name $DEPLOYMENT_GROUP_API || true)
+            if [ -z "$DEPLOYMENT_GROUP_EXISTS" ]; then
+              echo "Deployment group does not exist, creating..."
+              aws deploy create-deployment-group --application-name $REPOSITORY_NAME --deployment-group-name $DEPLOYMENT_GROUP_API --ec2-tag-filters Key=Name,Value=$EC2_NAME_API,Type=KEY_AND_VALUE --service-role-arn $CODE_DEPLOY_ARN
+
+            else
+              echo "Deployment group already exists, skipping creation..."
+            fi
+          - |
+            if [ "$BITBUCKET_BRANCH" == "master" ]; then
+              export IMAGES=latest
+            fi
+          # Uploads Zip FIle into S3
+          - pipe: atlassian/aws-code-deploy:0.2.10
+            variables:
+              <<: *uploads-variables # Insert Variables from uploads-variables
+          # Deploy file zip into server & running script file
+          - pipe: atlassian/aws-code-deploy:0.2.10
+            variables:
+              <<: *deploy-variables-api # Insert Variables from deploy-variables-api
+    ############################
+    # Deploy to dev staging  consumer server
+    ############################
+    - step: &deploy-consumer
+        name: AWS Code Deploy Consumer
+        services:
+          - docker
+        caches:
+          - docker
+        image: public.ecr.aws/v3u2f5f3/dbo:awscli-alpine
+        script:
+          # Replace Variable in file start & stop script
+          - *export-env # Call script from export env
+          - source set_env.sh
+          # Change repository name on appspec.yml
+          - sed -i "s+\$REPOSITORY_NAME+$REPOSITORY_NAME+g;" appspec.yml
+          # Change var on start.sh
+          - sed -i "s+\$REPOSITORY_NAME+$REPOSITORY_NAME+g;" scripts/start.sh
+          - sed -i "s+\$IMAGES+$IMAGES+g;" scripts/start.sh
+          - sed -i "s+\$AWS_REGISTRY_URL+$AWS_REGISTRY_URL+g;" scripts/start.sh
+          - sed -i "s+\$APP_ENV+$APP_ENV+g;" scripts/start.sh
+          - sed -i "s+\$HANDLER_TYPE+consumer+g;" scripts/start.sh
+          # Change var on stop.sh
+          - sed -i "s+\$HANDLER_TYPE+consumer+g;" scripts/stop.sh
+          - sed -i "s+\$REPOSITORY_NAME+$REPOSITORY_NAME+g;" scripts/stop.sh
+          # Archive with zip folder scripts
+          - zip -r $BITBUCKET_REPO_SLUG.zip appspec.yml scripts
+          # Check if application exists
+          - echo "Checking if application exists..."
+          - |
+            APP_EXISTS=$(aws deploy get-application --application-name $REPOSITORY_NAME || true)
+            if [ -z "$APP_EXISTS" ]; then
+              echo "Application does not exist, creating..."
+              aws deploy create-application --application-name $REPOSITORY_NAME
+            else
+              echo "Application already exists, skipping creation..."
+            fi
+          # Check if deployment group exists
+          - echo "Checking if deployment group exists..."
+          - |
+            DEPLOYMENT_GROUP_EXISTS=$(aws deploy get-deployment-group --application-name $REPOSITORY_NAME --deployment-group-name $DEPLOYMENT_GROUP_CONSUMER || true)
+            if [ -z "$DEPLOYMENT_GROUP_EXISTS" ]; then
+              echo "Deployment group does not exist, creating..."
+              aws deploy create-deployment-group --application-name $REPOSITORY_NAME --deployment-group-name $DEPLOYMENT_GROUP_CONSUMER --ec2-tag-filters Key=Name,Value=$EC2_NAME_CONSUMER,Type=KEY_AND_VALUE --service-role-arn $CODE_DEPLOY_ARN
+            else
+              echo "Deployment group already exists, skipping creation..."
+            fi
+          # Uploads Zip FIle into S3
+          - pipe: atlassian/aws-code-deploy:0.2.10
+            variables:
+              <<: *uploads-variables # Insert Variables from uploads-variables
+          # Deploy file zip into server & running script file
+          - pipe: atlassian/aws-code-deploy:0.2.10
+            variables:
+              <<: *deploy-variables-consumer # Insert Variables from deploy-variables-consumer
+
+# Pipeline Trigger every push into selective branch
+pipelines:
+  tags:
+    "*": #Semua tag akan di eksekusi
+      - parallel: # Parallel Process Set env & build image
+          steps:
+            - step:
+                name: Set env Production
+                script:
+                  #Export variables production into files
+                  - echo export "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID_PROD" >> set_env.sh
+                  - echo export "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY_PROD" >> set_env.sh
+                  - echo export "S3_BUCKET=$S3_BUCKET_PROD">> set_env.sh
+                  - echo export "APP_ENV=production">> set_env.sh
+                  - echo export "CODE_DEPLOY_ARN=$CODE_DEPLOY_ARN_PROD">> set_env.sh
+                  - echo export "EC2_NAME_API=$EC2_NAME_API_PROD" >> set_env.sh
+                artifacts:
+                  - set_env.sh
+            - step: *build-prod # Anchores build step
+      # - step: *deploy-ecs
+      # - step: *deploy-prod
+      # - step: *deploy-prod-consumer
+
+
+  branches:
+    # master:
+    #   - parallel: # Parallel Process Set env & build image
+    #       steps:
+    #         - step:
+    #             name: Set env Production
+    #             script:
+    #               #Export variables production into files
+    #               - echo export "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID_PROD}" >> set_env.sh
+    #               - echo export "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY_PROD}" >> set_env.sh
+    #               - echo export "S3_BUCKET=${S3_BUCKET_PROD}">> set_env.sh
+    #             artifacts:
+    #               - set_env.sh
+    #         - step: *build # Anchores build step
+    #   - step: *deploy-api # Anchores Deploy-api step
+
+    staging:
+      - parallel: # Parallel Process Set env & build image
+          steps:
+            - step:
+                name: Set env Staging
+                script:
+                  #Export variables Staging into files
+                  - echo export "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID_STG" >> set_env.sh
+                  - echo export "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY_STG" >> set_env.sh
+                  - echo export "S3_BUCKET=$S3_BUCKET_STG">> set_env.sh
+                  - echo export "CODE_DEPLOY_ARN=$CODE_DEPLOY_ARN">> set_env.sh
+                artifacts:
+                  - set_env.sh
+            - step: *build # Anchores build step
+      - step: *deploy-api
+      # - step: *deploy-consumer
+
+    development:
+      - parallel: # Parallel Process Set env & build image
+          steps:
+            - step:
+                name: Set env Development
+                script:
+                  #Export variables Development into files
+                  - echo export "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID_DEV" >> set_env.sh
+                  - echo export "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY_DEV" >> set_env.sh
+                  - echo export "S3_BUCKET=$S3_BUCKET_DEV">> set_env.sh
+                  - echo export "CODE_DEPLOY_ARN=$CODE_DEPLOY_ARN_DEV">> set_env.sh
+                artifacts:
+                  - set_env.sh
+            - step: *build # Anchores build step
+      - step: *deploy-api
+      # - step: *deploy-consumer

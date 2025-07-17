@@ -1,0 +1,328 @@
+syntax="proto3";
+package grpcs;
+
+option go_package = "./grpc-protos";
+
+message GetStoreByIDRequest {
+  int32 id = 1;
+}
+
+message GetStoreByStoreCodeRequest {
+  string store_code = 1;
+}
+
+message GetStoreByIDAndAgentIDRequest {
+  int32 id = 1;
+  int32 agent_id=2;
+}
+
+message GetAllTokoDBORequest {
+    string name = 1;
+    string address = 2;
+    string contact_name = 3;
+    string main_mobile_phone = 4;
+    string code = 5;
+}
+
+message GetAllTokoForSalesmanDBORequest {
+    string name = 1;
+    string address = 2;
+    string contact_name = 3;
+    string main_mobile_phone = 4;
+    string code = 5;
+    int32 province_id = 6;
+    int32 city_id = 7;
+    int32 district_id = 8;
+    int32 village_id = 9;
+    string store_category = 10;
+    string status = 11;
+    string email = 12;
+    string is_verified = 13;
+    repeated int32 agent_id = 14;
+    string prospect = 15;
+    string type = 16;
+    int32 page = 17;
+    int32 per_page = 18;
+    string sort_type =19;
+    bool count_only = 20;
+}
+
+message GetAllPengajuanTokoRequest {
+    string name = 1;
+    string address = 2;
+    string contact_name = 3;
+    string main_mobile_phone = 4;
+}
+
+message StoreResponse {
+  int32 id=1;
+  string store_code=2;
+  int32 store_category_id=3;
+  string store_category_name=4;
+  string name=5;
+  string address=6;
+  string province_id=7;
+  string province_name=8;
+  string city_id=9;
+  string city_name=10;
+  string district_id=11;
+  string district_name=12;
+  string village_id=13;
+  string village_name=14;
+  string status=15;
+  int32 agent_id=16;
+  string alias_name=17;
+  string alias_code=18;
+  string phone=19;
+  string contact_name=20;
+  string status_pengajuan=21;
+  string main_mobile_phone=22;
+  string email=23;
+  int32 email_verified=24;
+  string description=25;
+  string data_type=26;
+  string postal_code=27;
+  string g_lat=28;
+  string g_lng=29;
+  string website=30;
+  string DBOApprovalStatus=31;
+  string verified_dbo=32;
+  string verified_date=33;
+  string validation_store=34;
+  string channel=35;
+  string stores_category=36;
+  string alternate_phone_1=37;
+  string alternate_phone_2=38;
+  string year_established=39;
+  string no_npwp=40;
+  string mapping_store_id= 41;
+  string date_my_store=42;
+  int32 total =43;
+}
+
+message StoreErrorResponse {
+  string message =1;
+  string system_message = 2;
+  int32  status_code =3;
+}
+
+message GetStoreResponse {
+  int32 status_code=1;
+  StoreResponse data=2;
+  StoreErrorResponse error=3;
+}
+
+message GetStoresResponse {
+    int32 status_code=1;
+    repeated StoreResponse data=2;
+    int32 total=3;
+    StoreErrorResponse error=4;
+}
+
+message GetIsMatchStoreAndAgentRequest {
+  int32 store_id=1;
+  int32 agent_id=2;
+}
+
+message GetIsMatchStoreAndAgentResponse {
+  bool is_match=1;
+  int32 status_code=2;
+  StoreErrorResponse error=3;
+}
+
+message GetStoreByStoreAliasCodeFromMappingStoreRequest {
+  int32 agent_id=1;
+  string store_alias_code=2;
+}
+
+message CheckBlacklistedStoreRequest {
+  int32 store_id=1;
+  int32 agent_id=2;
+  int32 brand_id=3;
+}
+
+message CheckBlacklistedStoreResponse {
+  bool is_blacklisted=1;
+  int32 status_code=2;
+  StoreErrorResponse error=3;
+  bool is_inactive=4;
+}
+
+message GetStoreByIDsRequest {
+  repeated int64 ids = 1;
+  int32 agent_id = 2;
+}
+
+message GetStoreByIDsWithoutAgentRequest {
+  repeated int64 ids = 1;
+}
+
+message GetStoreByIDsResponse {
+  repeated Store data = 1;
+  int32 status_code = 2;
+  StoreErrorResponse error = 3;
+}
+
+message GetAllStoreByIDsRequest {
+  repeated int64 ids = 1;
+  int32 agent_id = 2;
+}
+
+message GetAllStoreByIDsResponse {
+  repeated Store data = 1;
+  int32 status_code = 2;
+  StoreErrorResponse error = 3;
+}
+
+message Store {
+  int64 id = 1;
+  string store_code = 2;
+  int32 store_category_id = 3;
+  string store_category_name = 4;
+  string store_category_slug = 5;
+  string store_category_status = 6;
+  string name = 7;
+  string email = 8;
+  int64 email_verified = 9;
+  string description = 10;
+  string address = 11;
+  int64 province_id = 12;
+  string province_name = 13;
+  int64 city_id = 14;
+  string city_name = 15;
+  int64 district_id = 16;
+  string district_name = 17;
+  int64 village_id = 18;
+  string village_name = 19;
+  string data_type = 20;
+  string postal_code = 21;
+  string g_place_id = 22;
+  string g_lat = 23;
+  string g_lng = 24;
+  string contact_name = 25;
+  string website = 26;
+  string phone = 27;
+  string main_mobile_phone = 28;
+  string alternate_phone_1 = 29;
+  string alternate_phone_2 = 30;
+  string alternate_phone_3 = 31;
+  string year_established = 32;
+  string status = 33;
+  string proof_of_business = 34;
+  int32 is_blacklisted = 35;
+  string no_npwp = 36;
+  string image_npwp = 37;
+  string np_siup = 38;
+  string image_siup = 39;
+  string image = 40;
+  string alias_name = 41;
+  string alias_code = 42;
+  string uid = 43;
+  string creator = 44;
+  int64 dbo_approval_status = 45;
+  int64 agent_id = 46;
+  int64 parent_id = 47;
+  int64 head_id = 48;
+  int64 use_apps = 49;
+  string agent_reference = 50;
+  int64 user_id_created = 51;
+  int64 user_id_updated = 52;
+  string status_pengajuan = 53;
+  string date_submited = 54;
+  string date_processed = 55;
+  string resubmit_allowed = 56;
+  string remarks = 57;
+  string verified_dbo = 58;
+  string verified_date = 59;
+  string salesman_referral_code = 60;
+  string validation_store = 61;
+  string validation_visitation = 62;
+  string channel = 63;
+  string hook_status = 64;
+  int32 sj_from_store_order_count = 65;
+  string date_my_store = 66;
+  string status_verification_temporary = 67;
+  int64 status_verification_user = 68;
+  string id_kf = 69;
+  string kf_full_name = 70;
+  string kf_email = 71;
+  bool is_redeem = 72;
+  int64 point = 73;
+  string created_at = 74;
+  string updated_at = 75;
+  string deleted_at = 76;
+  repeated Address addresses = 77;
+  string revalidation_status = 78;
+}
+
+message Address {
+  int64 id = 1;
+  string name = 2;
+  int64 store_id = 3;
+  string store_code = 4;
+  string store_name = 5;
+  string email = 6;
+  string mobile_phone = 7;
+  string phone = 8;
+  string pic_name = 9;
+  string description = 10;
+  int32 is_main = 11;
+  int32 is_warehouse = 12;
+  string g_lat = 13;
+  string g_lng = 14;
+  string g_place_id = 15;
+  string address = 16;
+  int32 province_id = 17;
+  string province_name = 18;
+  int32 city_id = 19;
+  string city_name = 20;
+  int32 district_id = 21;
+  string district_name = 22;
+  int64 village_id = 23;
+  string village_name = 24;
+  string created_at = 25;
+  string updated_at = 26;
+  string deleted_at = 27;
+}
+
+
+message GetStoresAllRequest {}
+
+message GetStoresAllResponse {
+    repeated StoreResponse data = 1;
+    StoreErrorResponse error = 2;
+    int32 status_code = 3;
+}
+
+message GetProspectStoreActiveCountByAgentIDsRequest{
+  repeated int64 agent_ids = 1;
+}
+
+message GetProspectStoreActiveCountByAgentIDsResponseItem {
+  int64 agent_id = 1;
+  int64 total = 2;
+}
+
+message GetProspectStoreActiveCountByAgentIDsResponse {
+  repeated GetProspectStoreActiveCountByAgentIDsResponseItem data = 1;
+  int32 status_code = 2;
+  StoreErrorResponse error = 3;
+}
+
+service StoreService {
+  rpc GetStoreByID(GetStoreByIDRequest) returns (GetStoreResponse){}
+  rpc GetStoreByStoreCode(GetStoreByStoreCodeRequest) returns (GetStoreResponse){}
+  rpc GetStoreByStoreAliasCodeFromMappingStore(GetStoreByStoreAliasCodeFromMappingStoreRequest) returns (GetStoreResponse) {}
+  rpc GetStoreByIDAndAgentID(GetStoreByIDAndAgentIDRequest) returns (GetStoreResponse) {}
+  rpc GetIsMatchStoreAndAgent(GetIsMatchStoreAndAgentRequest) returns (GetIsMatchStoreAndAgentResponse) {}
+  rpc GetAllTokoDBO(GetAllTokoDBORequest) returns (GetStoresResponse) {}
+  rpc GetAllPengajuanToko(GetAllPengajuanTokoRequest) returns (GetStoresResponse) {}
+  rpc CheckBlacklistedStore(CheckBlacklistedStoreRequest) returns (CheckBlacklistedStoreResponse) {}
+  rpc GetStoreByIDs(GetStoreByIDsRequest) returns (GetStoreByIDsResponse) {}
+  rpc GetStoreByIDsWithoutAgent(GetStoreByIDsWithoutAgentRequest) returns (GetStoreByIDsResponse) {}
+  rpc GetStoreVisitationByID(GetStoreByIDRequest) returns (GetStoreResponse){}
+  rpc GetAllTokoDBOForSalesman(GetAllTokoForSalesmanDBORequest) returns (GetStoresResponse) {}
+  rpc GetStoresAll(GetStoresAllRequest) returns (GetStoresAllResponse){}
+  rpc GetAllStoreByIDs(GetAllStoreByIDsRequest) returns (GetAllStoreByIDsResponse) {}
+  rpc GetProspectStoreActiveCountByAgentIDs(GetProspectStoreActiveCountByAgentIDsRequest) returns (GetProspectStoreActiveCountByAgentIDsResponse) {}
+}

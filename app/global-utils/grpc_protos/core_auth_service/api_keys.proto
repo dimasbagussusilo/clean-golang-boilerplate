@@ -1,0 +1,30 @@
+syntax="proto3";
+package core_auth_service;
+
+option go_package = "appsku-golang/app/global-utils/generated/grpc_protos/core_auth_service";
+
+import "common.proto";  // Import common model
+
+message CreateApiKeyResponse {
+  int32 status_code = 1;
+  string id = 2;
+  grpc_protos.ErrorLog error_log = 3;
+}
+
+message ValidateApiKeyResponse {
+  int32 status_code = 1;
+  bool valid = 2;
+  ApiKeysData data = 3;
+  grpc_protos.ErrorLog error_log = 4;
+}
+
+message ApiKeysData {
+  string client_name = 1;
+  string description = 2;
+}
+
+service ApiKeysService {
+  rpc Create(ApiKeysData) returns (CreateApiKeyResponse) {}
+  rpc DeleteById(grpc_protos.IdStringRequest) returns (grpc_protos.DeleteByIdResponse) {}
+  rpc ValidateApiKey(grpc_protos.IdStringRequest) returns (ValidateApiKeyResponse) {}
+}

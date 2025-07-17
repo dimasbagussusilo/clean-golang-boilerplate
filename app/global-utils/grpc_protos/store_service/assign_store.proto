@@ -1,0 +1,25 @@
+syntax = "proto3";
+package grpcs;
+
+option go_package = "./grpc-protos";
+
+message AssignStoreError {
+    string message = 1;
+    string system_message = 2;
+    int32 status_code = 3;
+}
+
+message GetListAgentIDAndBrandIDByStoreIDRequest{
+    int64 store_id = 1;
+}
+
+message GetListAgentIDAndBrandIDByStoreIDResponse {
+    int32 status_code = 1;
+    repeated int64 agent_id_list = 2;
+    repeated int64 brand_id_list = 3;
+    AssignStoreError error = 4;
+}
+
+service AssignStoreService {
+    rpc GetListAgentIDAndBrandIDByStoreID(GetListAgentIDAndBrandIDByStoreIDRequest) returns (GetListAgentIDAndBrandIDByStoreIDResponse) {}
+}

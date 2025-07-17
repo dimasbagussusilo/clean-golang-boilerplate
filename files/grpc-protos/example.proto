@@ -1,0 +1,17 @@
+syntax="proto3";
+package grpcs;
+
+option go_package = "./grpc-protos";
+
+message GetExampleRequest {
+  int32 id = 1;
+}
+
+message GetExampleResponse {
+  int32 status_code=1;
+  int32 total=3;
+}
+
+service ExampleService {
+  rpc GetExample(GetExampleRequest) returns (GetExampleResponse){}
+}

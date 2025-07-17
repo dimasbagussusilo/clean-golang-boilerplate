@@ -1,0 +1,15 @@
+package constants
+
+const (
+	//server name
+	SENTRY_API_SERVER_NAME      = "Api"
+	SENTRY_GRPC_SERVER_NAME     = "gRpc"
+	SENTRY_CONSUMER_SERVER_NAME = "Consumer"
+
+	//status capture
+	SENTRY_STATUS_CAPTURE_SERVER_ERROR_RESPONSE        = "ServerErrorResponse"
+	SENTRY_STATUS_CAPTURE_INFORMATIONAL_ERROR_RESPONSE = "InformationalResponse"
+	SENTRY_STATUS_CAPTURE_SUCCESS_ERROR_RESPONSE       = "SuccessResponse"
+	SENTRY_STATUS_CAPTURE_REDIRECTION_ERROR_RESPONSE   = "RedirectionResponse"
+	SENTRY_STATUS_CAPTURE_CLIENT_ERROR_RESPONSE        = "ClientErrorResponse"
+)

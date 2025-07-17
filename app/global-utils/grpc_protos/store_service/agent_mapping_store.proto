@@ -1,0 +1,27 @@
+syntax="proto3";
+package grpcs;
+
+option go_package = "./grpc-protos";
+
+message AgentMappingStoreError {
+    string message=1;
+    string system_message=2;
+    int32 status_code=3;
+}
+
+message GetTotalStoresItem {
+    int64 agent_id=1;
+    int64 stores=2;
+}
+
+message GetTotalStoresRequest{}
+
+message GetTotalStoresResponse {
+    int32 status_code=1;
+    repeated GetTotalStoresItem data=2;
+    AgentMappingStoreError error=3;
+}
+
+service AgentMappingStoreService {
+    rpc GetTotalStores(GetTotalStoresRequest) returns (GetTotalStoresResponse) {}
+}

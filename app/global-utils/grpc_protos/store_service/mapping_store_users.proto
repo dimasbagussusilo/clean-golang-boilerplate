@@ -1,0 +1,35 @@
+syntax="proto3";
+package grpcs;
+
+option go_package = "./grpc-protos";
+
+message GetMappingStoreUserByPhoneNumberRequest {
+    string phone_number = 1;
+}
+
+message MappingStoreUserResponse {
+    int32 id=1;
+    string id_kf=2;
+    string full_name=3;
+    string phone_number=4;
+    string email=5;
+    string role=6;
+    int32 store_id=7;
+    int32 status_verification=8;
+}
+
+message MappingStoreUsersGeneralErrorResponse {
+    string message=1;
+    string system_message=2;
+    int32 status_code=3;
+}
+
+message GetMappingStoreUserByPhoneNumberResponse {
+    int32 status_code=1;
+    MappingStoreUserResponse data=2;
+    MappingStoreUsersGeneralErrorResponse error=3;
+}
+
+service MappingStoreUsersService {
+    rpc GetMappingStoreUsersByPhoneNumber(GetMappingStoreUserByPhoneNumberRequest) returns (GetMappingStoreUserByPhoneNumberResponse){}
+}

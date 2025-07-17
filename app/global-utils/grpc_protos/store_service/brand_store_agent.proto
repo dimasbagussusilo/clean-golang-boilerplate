@@ -1,0 +1,39 @@
+syntax="proto3";
+package grpcs;
+
+option go_package = "./grpc-protos";
+
+message BrandStoreAgentError {
+    string message=1;
+    string system_message=2;
+    int32 status_code=3;
+}
+
+message BrandStoreAgent {
+    int64 id=1;
+    int64 brand_id=2;
+    int64 store_id=3;
+    int64 agent_id=4;
+    int64 is_active=5;
+    string created_at=6;
+    string updated_at=7;
+	  string deleted_at=8;
+}
+
+message GetMappingBrandStoreAgentRequest {
+    int64 brand_id=1;
+    int64 store_id=2;
+    int64 agent_id=3;
+    int64 check_multiple_brand=4;
+    string table_name=5;
+}
+
+message GetMappingBrandStoreAgentResponse {
+    int32 status_code=1;
+    BrandStoreAgent data=2;
+    BrandStoreAgentError error=3;
+}
+
+service BrandStoreAgentService {
+    rpc GetMappingBrandStoreAgent(GetMappingBrandStoreAgentRequest) returns (GetMappingBrandStoreAgentResponse) {}
+}
