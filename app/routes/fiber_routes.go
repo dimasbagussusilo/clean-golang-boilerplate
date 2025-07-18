@@ -29,10 +29,14 @@ func NewFiberRoute(ctrlExample *controllers.ExampleController, ctrlStore *contro
 	storeV1 := v1.Group("/store")
 	storeV1.Post("/", fiberStoreCtrl.Insert)
 	storeV1.Post("/with-setting", fiberStoreCtrl.InsertWithSetting)
+	storeV1.Post("/with-location", fiberStoreCtrl.InsertWithLocation)
 	storeV1.Get("/", fiberStoreCtrl.GetAll)
 	storeV1.Get("/:id", fiberStoreCtrl.GetById)
 	storeV1.Patch("/:id", fiberStoreCtrl.Update)
 	storeV1.Delete("/:id", fiberStoreCtrl.Delete)
+
+	// File upload endpoint
+	v1.Post("/upload", fiberStoreCtrl.UploadFile)
 
 	f.Use(func(c *fiber.Ctx) error {
 		return c.Status(http.StatusNotFound).JSON(model.Response{

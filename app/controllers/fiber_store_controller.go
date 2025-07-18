@@ -6,8 +6,12 @@ import (
 	"context"
 	"math"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"time"
 
+	"appsku-golang/app/global-utils/helper"
 	"appsku-golang/app/global-utils/model"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
@@ -201,6 +205,63 @@ func (c *FiberStoreController) InsertWithSetting(ctx *fiber.Ctx) error {
 	return responses.SendFiberResponse(ctx, result)
 }
 
+func (c *FiberStoreController) InsertWithLocation(ctx *fiber.Ctx) error {
+	var result model.Response
+	var errorLog *model.ErrorLog
+	var storeWithLocation struct {
+		Name        string                `json:"name" validate:"required"`
+		Description string                `json:"description" validate:"required"`
+		Type        string                `json:"type" validate:"required,oneof=retail grosir"`
+		Location    *models.StoreLocation `json:"location" validate:"required"`
+	}
+
+	if err := ctx.BodyParser(&storeWithLocation); err != nil {
+		errorLog = &model.ErrorLog{
+			Message:       "Bad Request",
+			SystemMessage: err.Error(),
+		}
+
+		result.Error = errorLog
+		result.StatusCode = http.StatusBadRequest
+		return responses.SendFiberResponse(ctx, result)
+	}
+
+	if err := c.Controller.Validator.Struct(storeWithLocation); err != nil {
+		errorLog = &model.ErrorLog{
+			Message:       "Bad Request",
+			SystemMessage: err.Error(),
+		}
+
+		result.Error = errorLog
+		result.StatusCode = http.StatusBadRequest
+		return responses.SendFiberResponse(ctx, result)
+	}
+
+	store := &models.Store{
+		Name:        storeWithLocation.Name,
+		Description: storeWithLocation.Description,
+		Type:        storeWithLocation.Type,
+		Location:    storeWithLocation.Location,
+	}
+
+	createdStore, err := c.Controller.StoreUseCase.Insert(context.Background(), store)
+	if err != nil {
+		errorLog := model.ErrorLog{
+			Message:       "Internal Server Error",
+			SystemMessage: err.Error(),
+		}
+
+		result.Error = &errorLog
+		result.StatusCode = http.StatusInternalServerError
+		return responses.SendFiberResponse(ctx, result)
+	}
+
+	result.StatusCode = http.StatusCreated
+	result.Data = createdStore
+
+	return responses.SendFiberResponse(ctx, result)
+}
+
 func (c *FiberStoreController) GetById(ctx *fiber.Ctx) error {
 	var result model.Response
 	var errorLog *model.ErrorLog
@@ -343,6 +404,69 @@ func (c *FiberStoreController) Delete(ctx *fiber.Ctx) error {
 	} else {
 		result.Data = map[string]interface{}{"message": "Store deleted successfully"}
 	}
+
+	return responses.SendFiberResponse(ctx, result)
+}
+
+func (c *FiberStoreController) UploadFile(ctx *fiber.Ctx) error {
+	var result model.Response
+	var errorLog *model.ErrorLog
+
+	file, err := ctx.FormFile("file")
+	if err != nil {
+		errorLog = &model.ErrorLog{
+			Message:       "Bad Request",
+			SystemMessage: "File not found in request: " + err.Error(),
+		}
+
+		result.Error = errorLog
+		result.StatusCode = http.StatusBadRequest
+		return responses.SendFiberResponse(ctx, result)
+	}
+
+	uploadsDir := "./files/uploads"
+	if err := os.MkdirAll(uploadsDir, 0755); err != nil {
+		errorLog = &model.ErrorLog{
+			Message:       "Internal Server Error",
+			SystemMessage: "Failed to create uploads directory: " + err.Error(),
+		}
+
+		result.Error = errorLog
+		result.StatusCode = http.StatusInternalServerError
+		return responses.SendFiberResponse(ctx, result)
+	}
+
+	fileExt := filepath.Ext(file.Filename)
+	uniqueID := helper.GetUniqueImageName()
+	fileName := uniqueID + fileExt
+	filePath := filepath.Join(uploadsDir, fileName)
+
+	if err := ctx.SaveFile(file, filePath); err != nil {
+		errorLog = &model.ErrorLog{
+			Message:       "Internal Server Error",
+			SystemMessage: "Failed to save file: " + err.Error(),
+		}
+
+		result.Error = errorLog
+		result.StatusCode = http.StatusInternalServerError
+		return responses.SendFiberResponse(ctx, result)
+	}
+
+	now := time.Now()
+	fileModel := &models.File{
+		FileName:     fileName,
+		OriginalName: file.Filename,
+		FilePath:     filePath,
+		FileSize:     file.Size,
+		FileType:     helper.GetMime(fileExt[1:]),
+		CreatedAt:    &now,
+	}
+
+	result.StatusCode = http.StatusOK
+
+	fileModel.ID = primitive.NewObjectID() // we must save the data file into a database
+
+	result.Data = fileModel
 
 	return responses.SendFiberResponse(ctx, result)
 }

@@ -140,6 +140,13 @@ type StoreWithSetting struct {
 	Setting *models.StoreSetting `json:"setting" validate:"required"`
 }
 
+type StoreWithLocation struct {
+	Name        string                `json:"name" validate:"required"`
+	Description string                `json:"description" validate:"required"`
+	Type        string                `json:"type" validate:"required,oneof=retail grosir"`
+	Location    *models.StoreLocation `json:"location" validate:"required"`
+}
+
 func (c *StoreController) InsertWithSetting(r *gin.Context) {
 	var result model.Response
 	var errorLog *model.ErrorLog
@@ -319,6 +326,62 @@ func (c *StoreController) Update(r *gin.Context) {
 
 	result.StatusCode = http.StatusOK
 	result.Data = gin.H{"message": "Store updated successfully"}
+
+	responses.SendResponse(r, result)
+}
+
+func (c *StoreController) InsertWithLocation(r *gin.Context) {
+	var result model.Response
+	var errorLog *model.ErrorLog
+	var storeWithLocation StoreWithLocation
+
+	if err := r.ShouldBindJSON(&storeWithLocation); err != nil {
+		errorLog = &model.ErrorLog{
+			Message:       constants.BadRequest,
+			SystemMessage: err.Error(),
+		}
+
+		result.Error = errorLog
+		result.StatusCode = http.StatusBadRequest
+		responses.SendResponse(r, result)
+		return
+	}
+
+	if err := c.Validator.Struct(storeWithLocation); err != nil {
+		errorLog = &model.ErrorLog{
+			Message:       constants.BadRequest,
+			SystemMessage: err.Error(),
+		}
+
+		result.Error = errorLog
+		result.StatusCode = http.StatusBadRequest
+		responses.SendResponse(r, result)
+		return
+	}
+
+	// Create a new Store object with the location
+	store := &models.Store{
+		Name:        storeWithLocation.Name,
+		Description: storeWithLocation.Description,
+		Type:        storeWithLocation.Type,
+		Location:    storeWithLocation.Location,
+	}
+
+	createdStore, err := c.StoreUseCase.Insert(r, store)
+	if err != nil {
+		errorLog := model.ErrorLog{
+			Message:       constants.InternalServerError,
+			SystemMessage: err.Error(),
+		}
+
+		result.Error = &errorLog
+		result.StatusCode = http.StatusInternalServerError
+		responses.SendResponse(r, result)
+		return
+	}
+
+	result.StatusCode = http.StatusCreated
+	result.Data = createdStore
 
 	responses.SendResponse(r, result)
 }
