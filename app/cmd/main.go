@@ -47,32 +47,19 @@ func main() {
 	args := flag.Args()
 	if len(args) == 0 {
 		args = append(args, "main")
-	} else if args[0] != "main" && args[0] != "consumer" && args[0] != "grpc" {
+	} else if args[0] != "main" && args[0] != "consumer" && args[0] != "grpc" && args[0] != "fiber" {
 		args[0] = "main"
 	}
 
 	switch args[0] {
 	case "main":
-		var httpServer interface{}
-
-		if cfg.WebFramework == "fiber" {
-			fiberApp := InitializeFiberServer(
-				grpcClientParams,
-				config.BuildRedisParam(),
-				config.BuildKafkaParam(),
-				config.BuildMongoDBParam(),
-			)
-			httpServer = fiberApp
-		} else {
-			// Default to Gin
-			ginEngine := InitializeHttpServer(
-				grpcClientParams,
-				config.BuildRedisParam(),
-				config.BuildKafkaParam(),
-				config.BuildMongoDBParam(),
-			)
-			httpServer = ginEngine
-		}
+		// Default to Gin
+		ginEngine := InitializeHttpServer(
+			grpcClientParams,
+			config.BuildRedisParam(),
+			config.BuildKafkaParam(),
+			config.BuildMongoDBParam(),
+		)
 
 		grpcServer := InitializeGrpcServer(
 			grpcClientParams,
@@ -85,7 +72,34 @@ func main() {
 
 		signal.Notify(signalExit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 		//go startGrpc(context.Background(), grpcServer, cfg)
-		go startServer(context.Background(), httpServer, cfg)
+		go startServer(context.Background(), ginEngine, cfg)
+
+		<-signalExit
+
+		helper.ExitHTTP <- true
+
+		grpcServer.GracefulStop()
+		time.Sleep(2 * time.Second)
+	case "fiber":
+		fiberApp := InitializeFiberServer(
+			grpcClientParams,
+			config.BuildRedisParam(),
+			config.BuildKafkaParam(),
+			config.BuildMongoDBParam(),
+		)
+
+		grpcServer := InitializeGrpcServer(
+			grpcClientParams,
+			config.BuildRedisParam(),
+			config.BuildKafkaParam(),
+			config.BuildMongoDBParam(),
+		)
+
+		signalExit := make(chan os.Signal, 1)
+
+		signal.Notify(signalExit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+		//go startGrpc(context.Background(), grpcServer, cfg)
+		go startServer(context.Background(), fiberApp, cfg)
 
 		<-signalExit
 
@@ -125,23 +139,19 @@ func main() {
 }
 
 func startServer(ctx context.Context, server interface{}, cfg config.Configuration) {
-	if cfg.WebFramework == "fiber" {
-		fiberApp, ok := server.(*fiber.App)
-		if !ok {
-			logrus.Fatal("Failed to cast server to *fiber.App")
-			return
-		}
-
+	// Check the type of server
+	switch s := server.(type) {
+	case *fiber.App:
 		go func() {
 			logrus.Info("Running Fiber server service on port ", cfg.MainPort)
 			addr := fmt.Sprintf(":%d", cfg.MainPort)
 			if cfg.UseSSL {
-				if err := fiberApp.ListenTLS(addr, cfg.PublicSSLPath, cfg.PrivateSSLPath); err != nil {
+				if err := s.ListenTLS(addr, cfg.PublicSSLPath, cfg.PrivateSSLPath); err != nil {
 					logrus.Error(err)
 					logrus.Fatal("shutting down Fiber server tls")
 				}
 			} else {
-				if err := fiberApp.Listen(addr); err != nil {
+				if err := s.Listen(addr); err != nil {
 					logrus.Error(err)
 					logrus.Fatal("shutting down Fiber server")
 				}
@@ -152,22 +162,15 @@ func startServer(ctx context.Context, server interface{}, cfg config.Configurati
 		<-helper.ExitHTTP
 		logrus.WithField(helper.GetRequestIDContext(ctx)).Infoln("Wait for http process done")
 
-		if err := fiberApp.Shutdown(); err != nil {
+		if err := s.Shutdown(); err != nil {
 			logrus.Fatal(err)
 		}
 
 		logrus.WithField(helper.GetRequestIDContext(ctx)).Infoln("http already exited")
-	} else {
-		// Default to Gin
-		ginEngine, ok := server.(*gin.Engine)
-		if !ok {
-			logrus.Fatal("Failed to cast server to *gin.Engine")
-			return
-		}
-
+	case *gin.Engine:
 		srv := &http.Server{
 			Addr:    fmt.Sprintf(":%d", cfg.MainPort),
-			Handler: ginEngine,
+			Handler: s,
 		}
 
 		go func() {
@@ -196,6 +199,8 @@ func startServer(ctx context.Context, server interface{}, cfg config.Configurati
 		}
 
 		logrus.WithField(helper.GetRequestIDContext(ctx)).Infoln("http already exited")
+	default:
+		logrus.Fatal("Unknown server type")
 	}
 }
 
