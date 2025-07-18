@@ -3,6 +3,7 @@ package routes
 import (
 	"appsku-golang/app/controllers"
 	"appsku-golang/app/handlers"
+	"appsku-golang/app/middlewares"
 	"context"
 	"net/http"
 
@@ -23,6 +24,7 @@ func NewFiberRoute(ctrlExample *controllers.ExampleController, ctrlStore *contro
 	})
 
 	v1 := f.Group("/v1")
+	v1.Use(middlewares.FiberBasicAuthMiddleware())
 
 	storeV1 := v1.Group("/store")
 	storeV1.Post("/", fiberStoreCtrl.Insert)

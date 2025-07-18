@@ -3,6 +3,7 @@ package routes
 import (
 	"appsku-golang/app/controllers"
 	"appsku-golang/app/handlers"
+	"appsku-golang/app/middlewares"
 	"context"
 	"net/http"
 
@@ -31,6 +32,7 @@ func NewHttpRoute(ctrlExample *controllers.ExampleController, ctrlStore *control
 	})
 
 	v1 := g.Group("/v1")
+	v1.Use(middlewares.BasicAuthMiddleware())
 	v1.GET("/example", routes.ExampleController.GetExample)
 
 	storeV1 := v1.Group("/store")
